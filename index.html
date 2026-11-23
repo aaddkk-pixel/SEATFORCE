@@ -45,7 +45,7 @@
   </div>
 
   <div class="card">
-    <div id="readingType" class="sub-label">Live Force (lbf)</div>
+    <div id="readingType" class="sub-label">Live Force</div>
     <div id="bigDisplay" class="big-force">0.0</div>
     <div id="statsLine" class="sub-label">Count: 0 &bull; SD: 0.00</div>
   </div>
@@ -57,7 +57,7 @@
     </div>
     <table>
       <thead>
-        <tr><th>#</th><th>Force (lbf)</th><th>SD</th><th>Time</th></tr>
+        <tr><th>#</th><th>Force</th><th>SD</th><th>Time</th></tr>
       </thead>
       <tbody id="historyBody"></tbody>
     </table>
@@ -168,7 +168,7 @@
     const parts = msg.split(',');
 
     if (parts.at(0) === 'LIVE' && !holdTimeout) {
-      readingType.textContent = 'Live Force (lbf)';
+      readingType.textContent = 'Live Force';
       bigDisplay.style.color = '#38bdf8';
       bigDisplay.textContent = parts.at(1);
     } else if (parts.at(0) === 'SEAT') {
