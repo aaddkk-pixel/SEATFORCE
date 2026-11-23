@@ -45,8 +45,8 @@
   </div>
 
   <div class="card">
-    <div id="readingType" class="sub-label">Live Force</div>
-    <div id="bigDisplay" class="big-force">0.0</div>
+    <div id="readingType" class="sub-label">Status</div>
+    <div id="bigDisplay" class="big-force">Ready...</div>
     <div id="statsLine" class="sub-label">Count: 0 &bull; SD: 0.00</div>
   </div>
 
@@ -70,6 +70,8 @@
 
   let rxChar = null;
   let holdTimeout = null;
+  let wakeLock = null;
+  let isConnected = false;
   let currentSession = 'SESSION';
   let sessionRows = [];
 
@@ -85,6 +87,36 @@
   const readingType = document.getElementById('readingType');
   const statsLine = document.getElementById('statsLine');
   const historyBody = document.getElementById('historyBody');
+
+  async function requestWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+    } catch (err) {
+      // Ignore if battery saver or browser blocks wake lock
+    }
+  }
+
+  function releaseWakeLock() {
+    if (wakeLock !== null) {
+      wakeLock.release().catch(() => {});
+      wakeLock = null;
+    }
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && isConnected) {
+      requestWakeLock();
+    }
+  });
+
+  function resetToReady() {
+    clearTimeout(holdTimeout);
+    holdTimeout = null;
+    readingType.textContent = 'Status';
+    bigDisplay.style.color = '#38bdf8';
+    bigDisplay.textContent = 'Ready...';
+  }
 
   if (!navigator.bluetooth) {
     document.getElementById('iosWarning').style.display = 'block';
@@ -114,9 +146,12 @@
       });
 
       device.addEventListener('gattserverdisconnected', () => {
+        isConnected = false;
         statusEl.textContent = 'Disconnected';
         sendBtn.disabled = true;
         connectBtn.disabled = false;
+        releaseWakeLock();
+        resetToReady();
       });
 
       const server = await device.gatt.connect();
@@ -129,9 +164,13 @@
 
       await writeLine(getFormattedTime());
 
+      isConnected = true;
+      await requestWakeLock();
+
       statusEl.textContent = 'Connected & Clock Synced';
       sendBtn.disabled = false;
       connectBtn.disabled = true;
+      resetToReady();
     } catch (err) {
       statusEl.textContent = 'Connection cancelled or failed';
     }
@@ -148,6 +187,7 @@
     csvBtn.disabled = true;
     statsLine.textContent = 'Count: 0 • SD: 0.00';
     statusEl.textContent = `Active Case: ${name}`;
+    resetToReady();
   });
 
   csvBtn.addEventListener('click', () => {
@@ -167,11 +207,7 @@
     const msg = decoder.decode(event.target.value).trim();
     const parts = msg.split(',');
 
-    if (parts.at(0) === 'LIVE' && !holdTimeout) {
-      readingType.textContent = 'Live Force';
-      bigDisplay.style.color = '#38bdf8';
-      bigDisplay.textContent = parts.at(1);
-    } else if (parts.at(0) === 'SEAT') {
+    if (parts.at(0) === 'SEAT') {
       const time = parts.at(1);
       const force = parts.at(2);
       const sd = parts.at(3);
@@ -183,14 +219,14 @@
       statsLine.textContent = `Count: ${count} • SD: ${sd}`;
 
       clearTimeout(holdTimeout);
-      holdTimeout = setTimeout(() => { holdTimeout = null; }, 4000);
+      holdTimeout = setTimeout(resetToReady, 6000);
 
       sessionRows.push({ session: currentSession, time, force, sd, count });
       csvBtn.disabled = false;
 
       const row = document.createElement('tr');
-      row.innerHTML = `<td>${count}</td><td><strong>${force}</strong></td><td>${sd}</td><td>${time}</td>`;
-      historyBody.insertBefore(row, historyBody.firstChild);
+      row.innerHTML = `<td>${count}</td><td>${force}</td><td>${sd}</td><td>${time}</td>`;
+      historyBody.prepend(row);
     }
   }
 </script>
